@@ -20,6 +20,23 @@ use glam::{ *, f32::* };
 use quasirandom::Qrng;
 use lerp::Lerp;
 use rand::{Rng, rngs::ThreadRng, thread_rng};
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(short, long, value_parser)]
+    samples: Option<u32>,
+
+    #[clap(short, long, value_parser)]
+    maxdepth: Option<u32>,
+
+    #[clap(short, long, value_parser)]
+    width: Option<u32>,
+
+    #[clap(short, long, value_parser)]
+    height: Option<u32>,
+}
 
 
 #[derive(Clone, Copy, Debug)]
@@ -87,32 +104,59 @@ fn get_color(r: Ray, max_depth: i32, rng: &mut ThreadRng) -> Vec3A {
 */
 
 fn main() {
-    let width = 512;
-    let height = 512;
+    let cli = Cli::parse();
+    let width = cli.width.or(cli.height).unwrap_or(512);
+    let height = cli.height.or(cli.width).unwrap_or(512);
     let mut dest = Rgb32FImage::new(width, height);
 
-    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(3.0, 4.5, 1.75), Vec3::new(0., 0., 1.), Vec3::Z);
+    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-8.0, -0.75, 1.75), Vec3::new(0., 0., 1.), Vec3::Z);
     let eye_to_scene = scene_to_eye.inverse();
     let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 45f32.to_radians() };
 
 
     let grey = Lambertian(Vec3A::new(0.5, 0.5, 0.5));
-    let yellow = Lambertian(Vec3A::new(1.0, 1.0, 0.0) * 0.3);
+    let yellow = Lambertian(Vec3A::new(0.4, 0.3, 0.1));
+    let check = Checkerboard { size: 1.0, a: &GlossWrap {
+        gloss_color: Vec3A::new(0.3, 0.225, 0.15),
+        diffuse_color: Vec3A::new(0., 0., 0.),
+        gloss_size: 0.1,
+        max_gloss: 1.0,
+        min_gloss: 1.0,
+        fresnel_power: 0.0
+    }, b: &GlossWrap {
+        gloss_color: Vec3A::ONE,
+        diffuse_color: Vec3A::new(0.4, 0.3, 0.1),
+        gloss_size: 0.3,
+        max_gloss: 0.2,
+        min_gloss: 0.0,
+        fresnel_power: 10.0
+    } };
+//    Lambertian(Vec3A::new(0.4, 0.3, 0.1)) };
+    let sphere = GlossWrap {
+        gloss_color: Vec3A::ONE,
+        diffuse_color: Vec3A::new(0.35, 0.4, 0.5),
+        gloss_size: 0.05,
+        max_gloss: 1.0,
+        min_gloss: 0.1,
+        fresnel_power: 2.0
+    };
+
     let scene = Scene {
         shapes: vec![
             Box::new(Sphere {
                 center: Vec3A::new(0., 0., 1.5),
                 radius: 1.5,
-                material: &grey
+                material: &sphere
             }),
-            Box::new(Plane::new(Vec3A::Z, Vec3A::X, Vec3A::ZERO, &yellow))
+            Box::new(Plane::new(Vec3A::Z, Vec3A::X, Vec3A::ZERO, &check))
             ]
     };
 
     let mut qrng = Qrng::<(f32, f32)>::new(0.69);
-    let mut trace_context = TraceContext::new(10);
+    let mut trace_context = TraceContext::new(cli.maxdepth.unwrap_or(5).max(1) as i32);
+    let bar = indicatif::ProgressBar::new((width * height) as u64);
+    let num_aa = cli.samples.unwrap_or(10);
     for (x, y, p) in dest.enumerate_pixels_mut() {
-        let num_aa = 1000;
         let mut total_color = Rgb([0., 0., 0.]);
         let mut h = DefaultHasher::new();
         x.hash(&mut h);
@@ -139,7 +183,10 @@ fn main() {
 
         //dbg!(scene_ray);
         *p = total_color;
+
+        bar.inc(1);
     }
+    bar.finish();
 
     if false {
         for p in dest.pixels_mut() {

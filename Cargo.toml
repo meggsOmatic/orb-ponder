@@ -13,6 +13,8 @@ lerp="*"
 rand="*"
 dyn-clone="1.0"
 rayon="*"
+indicatif="*"
+clap={ version = "3.2", features = ["derive"] }
 
 [profile.release]
 lto="thin"

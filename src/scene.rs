@@ -55,6 +55,7 @@ pub struct TraceContext {
   rng1_list: Vec<Qrng<f32>>,
   rng2_list: Vec<Qrng<(f32, f32)>>,
   rng3_list: Vec<Qrng<(f32, f32, f32)>>,
+  thread_rng: ThreadRng,
   reseed: f64,
 }
 
@@ -69,10 +70,12 @@ impl TraceContext {
       rng1_list: Vec::new(),
       rng2_list: Vec::new(),
       rng3_list: Vec::new(),
-      reseed: 0.5,
+      thread_rng: thread_rng(),
+      reseed: thread_rng().gen(),
     }
   }
 
+  #[inline(always)]
   pub fn try_push(&mut self) -> bool {
     assert!(self.current_depth >= 0);
     assert!(self.current_depth <= self.max_depth);
@@ -84,12 +87,21 @@ impl TraceContext {
     }
   }
 
+  #[inline(always)]
   pub fn pop(&mut self) {
     assert!(self.current_depth > 0);
     assert!(self.current_depth <= self.max_depth);
     self.current_depth -= 1;
   }
 
+
+  #[inline(always)]
+  pub fn rngen(&mut self) -> f32 {
+    self.thread_rng.gen()
+  }
+
+
+  #[inline(always)]
   pub fn rng1(&mut self) -> f32 {
     if self.next_rng1 >= self.rng1_list.len() {
       self.next_rng1 = self.rng1_list.len();
@@ -100,7 +112,7 @@ impl TraceContext {
     self.rng1_list[self.next_rng1 - 1].gen()
   }
 
-
+  #[inline(always)]
   pub fn rng2(&mut self) -> Vec2 {
     if self.next_rng2 >= self.rng2_list.len() {
       self.next_rng2 = self.rng2_list.len();
@@ -111,6 +123,7 @@ impl TraceContext {
     Vec2::from(self.rng2_list[self.next_rng2 - 1].gen())
   }
 
+  #[inline(always)]
   pub fn rng3(&mut self) -> Vec3A {
     if self.next_rng3 >= self.rng3_list.len() {
       self.next_rng3 = self.rng3_list.len();
@@ -136,7 +149,12 @@ impl TraceContext {
     self.rng1_list.clear();
     self.rng2_list.clear();
     self.rng3_list.clear();
-    self.reseed = thread_rng().gen();
+    self.reseed = self.thread_rng.gen();
+  }
+
+  #[inline(always)]
+  pub fn blur_vector(&mut self, v: Vec3A, blur_amount: f32) -> Vec3A {
+    ((Vec3A::splat(2.0) * self.rng3() - Vec3A::ONE) * blur_amount.clamp(0.0, 0.999) + v).normalize()
   }
 }
 

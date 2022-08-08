@@ -45,4 +45,6 @@ pub fn get_point_in_sphere(rng: &mut TraceContext) -> Vec3A {
 }
 
 
-
+pub fn reflect(ray: Vec3A, normal: Vec3A) -> Vec3A {
+  ray - 2. * ray.dot(normal) * normal
+}
