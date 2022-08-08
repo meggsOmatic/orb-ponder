@@ -17,7 +17,7 @@ use rand::{Rng, rngs::ThreadRng, thread_rng};
 
 
 
-pub trait Shape : std::fmt::Debug + dyn_clone::DynClone  {
+pub trait Shape : std::fmt::Debug + dyn_clone::DynClone + Sync  {
   fn trace_ray(&self, ray: Ray) -> Option<Hit>;
   fn get_bounds(&self) -> Option<(Vec3A, Vec3A)>;
 }

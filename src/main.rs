@@ -21,6 +21,7 @@ use quasirandom::Qrng;
 use lerp::Lerp;
 use rand::{Rng, rngs::ThreadRng, thread_rng};
 use clap::{Parser, Subcommand};
+use rayon::{ *, iter::* };
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -152,41 +153,43 @@ fn main() {
             ]
     };
 
-    let mut qrng = Qrng::<(f32, f32)>::new(0.69);
-    let mut trace_context = TraceContext::new(cli.maxdepth.unwrap_or(5).max(1) as i32);
     let bar = indicatif::ProgressBar::new((width * height) as u64);
     let num_aa = cli.samples.unwrap_or(10);
-    for (x, y, p) in dest.enumerate_pixels_mut() {
-        let mut total_color = Rgb([0., 0., 0.]);
-        let mut h = DefaultHasher::new();
-        x.hash(&mut h);
-        y.hash(&mut h);
+    let max_depth = cli.maxdepth.unwrap_or(5).max(1) as i32;
+    let colors: Vec<_> = (0..(width * height)).into_par_iter().map(|pixel_number| {
+        let x = pixel_number % width;
+        let y = pixel_number / width;
+        let mut total_color = Vec3A::ZERO;
+        let mut trace_context = TraceContext::new(max_depth);
         for _ in 0..num_aa {
-            let xy = Vec2::new(x as f32, y as f32) - Vec2::splat(0.5) + Vec2::from(qrng.gen());
+            let xy = Vec2::new(x as f32, y as f32) - Vec2::splat(0.5) + trace_context.rng2();
             let view_dir = viewport.pixel_to_dir(xy);
-            //dbg!(x, y, view_dir);
-            //let norm = Vec3A::splat(0.5) + 0.5 * view_dir;
             let scene_ray = Ray {
                 origin: eye_to_scene.translation,
                 direction: eye_to_scene.transform_vector3a(view_dir)
             };
             let sample_color = scene.get_color(scene_ray, &mut trace_context);
             trace_context.next_sample();
-            total_color[0] += sample_color[0];
-            total_color[1] += sample_color[1];
-            total_color[2] += sample_color[2];
+            total_color += sample_color;
         }
-        trace_context.next_pixel();
-        total_color[0] /= num_aa as f32;
-        total_color[1] /= num_aa as f32;
-        total_color[2] /= num_aa as f32;
-
-        //dbg!(scene_ray);
-        *p = total_color;
-
         bar.inc(1);
-    }
+        total_color / num_aa as f32
+    }).collect();
     bar.finish();
+
+
+    for (c, p) in colors.iter().zip(dest.pixels_mut()) {
+        let srgb = |c: f32| {
+            if c > 0.0 {
+                if c <= 0.0031308 { c * 12.92 }
+                else if c < 1.0 { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+                else { 1.0 }
+            } else { 0.0 }
+        };
+        p[0] = srgb(c.x);
+        p[1] = srgb(c.y);
+        p[2] = srgb(c.z);
+    }
 
     if false {
         for p in dest.pixels_mut() {
@@ -200,7 +203,7 @@ fn main() {
         }
     }
 
-    if true {
+    if false {
         for p in dest.pixels_mut() {
         p.apply(|c|
             if c > 0.0 {

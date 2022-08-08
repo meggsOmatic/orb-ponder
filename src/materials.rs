@@ -15,7 +15,7 @@ use std::{
     io::Cursor,
 };
 
-pub trait Material: std::fmt::Debug + dyn_clone::DynClone {
+pub trait Material: std::fmt::Debug + dyn_clone::DynClone + Sync {
     fn get_color(&self, scene: &Scene, ray: Ray, hit: &Hit, ctx: &mut TraceContext) -> Vec3A;
 }
 
