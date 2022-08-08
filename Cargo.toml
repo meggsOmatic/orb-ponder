@@ -11,3 +11,8 @@ image="*"
 quasirandom="*"
 lerp="*"
 rand="*"
+dyn-clone="1.0"
+rayon="*"
+
+[profile.release]
+lto="thin"

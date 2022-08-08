@@ -1,4 +1,18 @@
-use std::io::Cursor;
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+
+mod materials;
+mod shapes;
+mod geom;
+mod scene;
+
+use crate::materials::*;
+use crate::shapes::*;
+use crate::geom::*;
+use crate::scene::*;
+
+use std::{io::Cursor, collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
 use image::buffer::ConvertBuffer;
 use image::io::Reader as ImageReader;
 use image::*;
@@ -7,29 +21,18 @@ use quasirandom::Qrng;
 use lerp::Lerp;
 use rand::{Rng, rngs::ThreadRng, thread_rng};
 
-#[derive(Clone, Copy, Debug)]
-struct Ray {
-    pub origin: Vec3A,
-    pub direction: Vec3A
-}
-
-impl Ray {
-    fn at(&self, dist: f32) -> Vec3A {
-        self.origin + dist * self.direction
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 struct Viewport {
     width: f32,
     height: f32,
-    vFOV: f32
+    v_fov: f32
 }
 
 
 impl Viewport {
     fn pixel_to_dir(&self, pixel: Vec2) -> Vec3A {
-        let tan_half_v_fov = (0.5 * self.vFOV).tan();
+        let tan_half_v_fov = (0.5 * self.v_fov).tan();
         let tan_half_h_fov = (self.width * tan_half_v_fov) / self.height;
         let centered_pixel = (pixel + Vec2::splat(0.5)) - 0.5 * Vec2::new(self.width, self.height);
         let norm_pixel = centered_pixel / Vec2::new(self.width, self.height);
@@ -40,35 +43,17 @@ impl Viewport {
     }
 }
 
+// fn get_point_in_sphere(rng: &mut ThreadRng) -> Vec3A {
+//     loop {
+//         let r = Vec3A::new(rng.gen(), rng.gen(), rng.gen()) * Vec3A::splat(2.0) - Vec3A::ONE;
+//         if r.length_squared() <= 1.0 { return r; }
+//     }
+// }
 
-struct Sphere {
-    pub center: Vec3A,
-    pub radius: f32
-}
 
-impl Sphere {
-    fn intersect(&self, r: Ray) -> Option<(f32, f32)> {
-        let to_center = self.center - r.origin;
-        let dir_dist_to_center = to_center.dot(r.direction);
-        let dir_to_center = dir_dist_to_center * r.direction;
-        let perp_to_center = to_center - dir_to_center;
-        let perp_len_squared = perp_to_center.length_squared();
-        if perp_len_squared < self.radius * self.radius {
-            let off = (self.radius * self.radius - perp_len_squared).sqrt();
-            Some((dir_dist_to_center - off, dir_dist_to_center + off))
-        } else {
-            None
-        }
-    }
-}
 
-fn get_point_in_sphere(rng: &mut ThreadRng) -> Vec3A {
-    loop {
-        let r = Vec3A::new(rng.gen(), rng.gen(), rng.gen()) * Vec3A::splat(2.0) - Vec3A::ONE;
-        if r.length_squared() <= 1.0 { return r; }
-    }
-}
 
+/*
 fn get_color(r: Ray, max_depth: i32, rng: &mut ThreadRng) -> Vec3A {
     let sphere = Sphere { center: Vec3A::new(0., 0., 1.5), radius: 1.5 };
     let sphere_hit = sphere.intersect(r);
@@ -99,45 +84,55 @@ fn get_color(r: Ray, max_depth: i32, rng: &mut ThreadRng) -> Vec3A {
         1.0 * Vec3A::new(0.1, 0.2, 0.3) + 0.04 * r.direction.dot(Vec3A::new(0.8, 1.2, 1.6).normalize()).max(0.).powf(10.) * Vec3A::new(200., 175., 150.)
     }
 }
-
+*/
 
 fn main() {
-    let mut dest = Rgb32FImage::new(512, 512);
-    if false {
-        for y in 0..dest.height() {
-            for x in 0..dest.width() {
-                dest.put_pixel(x, y, Rgb([x as f32 / 511f32, y as f32 / 511f32, 0.5f32]));
-            }
-        }
-    }
+    let width = 512;
+    let height = 512;
+    let mut dest = Rgb32FImage::new(width, height);
 
-
-    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-8.0, -0.8, 1.75), Vec3::new(0., 0., 1.), Vec3::Z);
-    dbg!(scene_to_eye);
+    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(3.0, 4.5, 1.75), Vec3::new(0., 0., 1.), Vec3::Z);
     let eye_to_scene = scene_to_eye.inverse();
-    dbg!(eye_to_scene);
-    let viewport = Viewport { width: dest.width() as f32, height: dest.height() as f32, vFOV: 45f32.to_radians() };
-    dbg!(viewport);
+    let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 45f32.to_radians() };
+
+
+    let grey = Lambertian(Vec3A::new(0.5, 0.5, 0.5));
+    let yellow = Lambertian(Vec3A::new(1.0, 1.0, 0.0) * 0.3);
+    let scene = Scene {
+        shapes: vec![
+            Box::new(Sphere {
+                center: Vec3A::new(0., 0., 1.5),
+                radius: 1.5,
+                material: &grey
+            }),
+            Box::new(Plane::new(Vec3A::Z, Vec3A::X, Vec3A::ZERO, &yellow))
+            ]
+    };
 
     let mut qrng = Qrng::<(f32, f32)>::new(0.69);
-    let mut rng = thread_rng();
+    let mut trace_context = TraceContext::new(10);
     for (x, y, p) in dest.enumerate_pixels_mut() {
         let num_aa = 1000;
         let mut total_color = Rgb([0., 0., 0.]);
+        let mut h = DefaultHasher::new();
+        x.hash(&mut h);
+        y.hash(&mut h);
         for _ in 0..num_aa {
             let xy = Vec2::new(x as f32, y as f32) - Vec2::splat(0.5) + Vec2::from(qrng.gen());
             let view_dir = viewport.pixel_to_dir(xy);
             //dbg!(x, y, view_dir);
-            let norm = Vec3A::splat(0.5) + 0.5 * view_dir;
+            //let norm = Vec3A::splat(0.5) + 0.5 * view_dir;
             let scene_ray = Ray {
                 origin: eye_to_scene.translation,
                 direction: eye_to_scene.transform_vector3a(view_dir)
             };
-            let sample_color = get_color(scene_ray, 10, &mut rng);
+            let sample_color = scene.get_color(scene_ray, &mut trace_context);
+            trace_context.next_sample();
             total_color[0] += sample_color[0];
             total_color[1] += sample_color[1];
             total_color[2] += sample_color[2];
         }
+        trace_context.next_pixel();
         total_color[0] /= num_aa as f32;
         total_color[1] /= num_aa as f32;
         total_color[2] /= num_aa as f32;
