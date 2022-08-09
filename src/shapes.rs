@@ -61,7 +61,8 @@ impl<'a> Shape for Sphere<'a> {
                   local_normal: normal,
                   material: self.material,
                   distance,
-                  started_inside
+                  started_inside,
+                  local_to_world: Mat3A::IDENTITY
               })
           } else {
               None
@@ -118,7 +119,8 @@ impl<'a> Shape for Plane<'a> {
           local_normal: if n_dot_o >= 0.0 { Vec3A::Z } else { Vec3A::NEG_Z },
           material: self.material,
           distance: dist,
-          started_inside: false
+          started_inside: false,
+          local_to_world: Mat3A { x_axis: self.right, y_axis: self.right, z_axis: self.normal }
         })
       }
     }
@@ -127,3 +129,24 @@ impl<'a> Shape for Plane<'a> {
 
   fn get_bounds(&self) -> Option<(Vec3A, Vec3A)> { None }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct Cuboid<'a> { // You might call this a Box, except std::boxed::Box is already kind of a big deal in Rust.
+  world_to_local: Affine3A,
+  local_to_world: Mat3A,
+  mins: Vec3A,
+  maxs: Vec3A,
+  material: &'a dyn Material
+}
+
+
+impl<'a> Shape for Cuboid<'a> {
+  fn trace_ray(&self, ray: Ray) -> Option<Hit> {
+    let local_origin = self.world_to_local.transform_point3a(ray.origin);
+    let local_dir = self.world_to_local.transform_vector3a(ray.direction);
+    None
+}
+
+  fn get_bounds(&self) -> Option<(Vec3A, Vec3A)> { None }
+}
+

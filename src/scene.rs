@@ -154,7 +154,7 @@ impl TraceContext {
 
   #[inline(always)]
   pub fn blur_vector(&mut self, v: Vec3A, blur_amount: f32) -> Vec3A {
-    ((Vec3A::splat(2.0) * self.rng3() - Vec3A::ONE) * blur_amount.clamp(0.0, 0.999) + v).normalize()
+    (get_point_in_sphere(self) * blur_amount.clamp(0.0, 0.999) + v).normalize()
   }
 }
 

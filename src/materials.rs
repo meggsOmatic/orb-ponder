@@ -62,10 +62,19 @@ impl Material for GlossWrap {
             .clamp(0., 1.)
             .powf(self.fresnel_power)
             .lerp(self.max_gloss, self.min_gloss);
-        
-        let gloss_dir = ctx.blur_vector(reflect(ray.direction, hit.world_normal), self.gloss_size);
+
+        let gloss_dir = reflect(ray.direction, ctx.blur_vector(hit.world_normal, self.gloss_size));
         let diffuse_dir = ctx.blur_vector(hit.world_normal, 1.0);
-        let color = if ctx.rng1() < fresnel {
+        let color = if ctx.rng1() >= fresnel {
+            self.diffuse_color
+                * scene.get_color(
+                    Ray {
+                        origin: hit.world_pos,
+                        direction: diffuse_dir,
+                    },
+                    ctx,
+                )
+        } else if gloss_dir.dot(hit.world_normal) > 0. {
             self.gloss_color
                 * scene.get_color(
                     Ray {
@@ -75,14 +84,7 @@ impl Material for GlossWrap {
                     ctx,
                 )
         } else {
-            self.diffuse_color
-                * scene.get_color(
-                    Ray {
-                        origin: hit.world_pos,
-                        direction: diffuse_dir,
-                    },
-                    ctx,
-                )
+            Vec3A::ZERO
         };
         ctx.pop();
         color
@@ -91,20 +93,68 @@ impl Material for GlossWrap {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Checkerboard<'a> {
-  pub size: f32,
-  pub a: &'a dyn Material,
-  pub b: &'a dyn Material
+    pub size: f32,
+    pub a: &'a dyn Material,
+    pub b: &'a dyn Material,
 }
 
 impl<'a> Material for Checkerboard<'a> {
     fn get_color(&self, scene: &Scene, ray: Ray, hit: &Hit, ctx: &mut TraceContext) -> Vec3A {
         let c = (hit.local_pos * Vec3A::splat(1. / self.size)).floor();
         if (c.x as i32 ^ c.y as i32 ^ c.z as i32) & 1 == 0 {
-          self.a.get_color(scene, ray, hit, ctx)
+            self.a.get_color(scene, ray, hit, ctx)
         } else {
-          self.b.get_color(scene, ray, hit, ctx)
+            self.b.get_color(scene, ray, hit, ctx)
         }
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct BrushedMetal {
+    pub size: f32,
+    pub radial_roughness: f32,
+    pub circumference_roughness: f32,
+    pub color: Vec3A
+}
+
+impl Material for BrushedMetal {
+    fn get_color(&self, scene: &Scene, ray: Ray, hit: &Hit, ctx: &mut TraceContext) -> Vec3A {
+        if !ctx.try_push() {
+            return Vec3A::ZERO;
+        }
+        let local = hit.local_pos * Vec3A::splat(1. / self.size);
+        let center = local.floor() + Vec3A::splat(0.5);
+        let offset = local - center;
+        let radial_dir = offset - offset.dot(hit.local_normal) * hit.local_normal;
+        let circumference_dir = hit.local_normal.cross(radial_dir);
+        let sphere = get_point_in_sphere(ctx);
+        let local_normal = radial_dir * (sphere.x * self.radial_roughness / radial_dir.length())
+            + circumference_dir * (sphere.y * self.circumference_roughness / radial_dir.length())
+            + hit.local_normal * (sphere.z * 0.999);
+        let world_normal = (hit.local_to_world * local_normal).normalize();
+        let reflected = reflect(ray.direction, world_normal);
+        let color = if reflected.dot(hit.world_normal) > 0. {
+          self.color * scene.get_color(Ray { origin: hit.world_pos, direction: reflected }, ctx)
+        } else {
+          Vec3A::ZERO
+        };
+
+        ctx.pop();
+        color
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Emitter {
+  pub color: Vec3A,
+  pub focus: f32,
+}
+
+
+impl Material for Emitter {
+  fn get_color(&self, scene: &Scene, ray: Ray, hit: &Hit, ctx: &mut TraceContext) -> Vec3A {
+    self.color * (-ray.direction.dot(hit.world_normal)).clamp(0.00001, 1.0).powf(self.focus)
+  }
 }
 
 /*

@@ -16,5 +16,3 @@ rayon="*"
 indicatif={version = "*", features = ["rayon"]}
 clap={ version = "3.2", features = ["derive"] }
 
-[profile.release]
-lto="thin"

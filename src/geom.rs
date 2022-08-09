@@ -33,6 +33,7 @@ pub struct Hit<'a> {
     pub material: &'a dyn Material,
     pub distance: f32,
     pub started_inside: bool,
+    pub local_to_world: Mat3A
 }
 
 
