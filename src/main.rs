@@ -110,30 +110,40 @@ fn main() {
     let height = cli.height.or(cli.width).unwrap_or(512);
     let mut dest = Rgb32FImage::new(width, height);
 
-    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-5., 2., 6.75), Vec3::new(0., 0., 1.), Vec3::Z);
+    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-10., -2., 2.75), Vec3::new(0., 1., 1.), Vec3::Z);
     let eye_to_scene = scene_to_eye.inverse();
-    let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 40f32.to_radians() };
+    let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 30_f32.to_radians() };
 
 
     let grey = Lambertian(Vec3A::new(0.5, 0.5, 0.5));
     let yellow = Lambertian(Vec3A::new(0.4, 0.3, 0.1));
-    let check = Checkerboard { size: 1.0, a: &GlossWrap {
+    let gloss_floor = GlossWrap {
         gloss_color: Vec3A::new(0.3, 0.225, 0.15),
         diffuse_color: Vec3A::new(0., 0., 0.),
         gloss_size: 0.06,
         max_gloss: 1.0,
         min_gloss: 1.0,
         fresnel_power: 0.0
-    }, b: &GlossWrap {
+    };
+    let yellow_floor = GlossWrap {
         gloss_color: Vec3A::ONE,
         diffuse_color: Vec3A::new(0.4, 0.3, 0.1),
         gloss_size: 0.2,
-        max_gloss: 0.4,
+        max_gloss: 0.2,
         min_gloss: 0.0,
         fresnel_power: 5.0
-    } };
+    };
+    let brushed_metal = BrushedMetal {
+        size: 1.0,
+        radial_roughness: 0.0,
+        circumference_roughness: 0.15,
+        color: Vec3A::new(0.8, 0.9, 1.0) * 0.2
+    };
+    let check = Checkerboard { size: 1.0, a: &gloss_floor, b: &yellow };
 
-    let check = BrushedMetal {
+
+
+    let brushed_metal = BrushedMetal {
         size: 1.0,
         radial_roughness: 0.15,
         circumference_roughness: 0.0,
@@ -150,6 +160,7 @@ fn main() {
     };
     let red = Lambertian(Vec3A::new(1.0, 0.0, 0.0));
     let green_glow = Emitter { color: vec3a(0.4, 1.0, 0.4), focus: 1.0 };
+    let white_glow = Emitter { color: vec3a(1.0, 1.0, 1.0) * 3., focus: 0.0 };
 
     let scene = Scene {
         shapes: vec![
@@ -158,6 +169,7 @@ fn main() {
                 radius: 1.5,
                 material: &sphere
             }),
+            Box::new(Cuboid::new(vec3a(-2., 2.5, 0.), Quat::from_rotation_z(130.0f32.to_radians()), vec3a(-0.1, -2., 0.0), vec3a(0.1, 2., 4.0), &white_glow)),
             Box::new(Sphere {
                 center: Vec3A::new(-1.25, -1.25, 0.5),
                 radius: 0.5,
