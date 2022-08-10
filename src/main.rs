@@ -110,7 +110,7 @@ fn main() {
     let height = cli.height.or(cli.width).unwrap_or(512);
     let mut dest = Rgb32FImage::new(width, height);
 
-    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-10., -2., 2.75), Vec3::new(0., 1., 1.), Vec3::Z);
+    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-10., -3., 2.75), Vec3::new(0., 0., 1.), Vec3::Z);
     let eye_to_scene = scene_to_eye.inverse();
     let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 30_f32.to_radians() };
 
@@ -145,9 +145,9 @@ fn main() {
 
     let brushed_metal = BrushedMetal {
         size: 1.0,
-        radial_roughness: 0.15,
-        circumference_roughness: 0.0,
-        color: Vec3A::new(0.8, 0.9, 1.0) * 0.4
+        radial_roughness: 0.01,
+        circumference_roughness: 0.15,
+        color: Vec3A::new(0.8, 0.9, 1.0) * 0.5
     };
 //    Lambertian(Vec3A::new(0.4, 0.3, 0.1)) };
     let sphere = GlossWrap {
@@ -169,7 +169,12 @@ fn main() {
                 radius: 1.5,
                 material: &sphere
             }),
-            Box::new(Cuboid::new(vec3a(-2., 2.5, 0.), Quat::from_rotation_z(130.0f32.to_radians()), vec3a(-0.1, -2., 0.0), vec3a(0.1, 2., 4.0), &white_glow)),
+            Box::new(Cuboid::new(
+                vec3a(3., -1.5, 0.),
+                Quat::from_rotation_z(-30.0f32.to_radians()),
+                vec3a(-0.1, -2., 0.0),
+                vec3a(0.1, 2., 4.0),
+                &brushed_metal)),
             Box::new(Sphere {
                 center: Vec3A::new(-1.25, -1.25, 0.5),
                 radius: 0.5,
