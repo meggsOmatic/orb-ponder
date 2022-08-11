@@ -110,9 +110,9 @@ fn main() {
     let height = cli.height.or(cli.width).unwrap_or(512);
     let mut dest = Rgb32FImage::new(width, height);
 
-    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-10., -3., 2.75), Vec3::new(0., 0., 1.), Vec3::Z);
+    let scene_to_eye = Affine3A::look_at_lh(Vec3::new(-11., -7., 2.5), Vec3::new(0., 0., 4.), Vec3::Z);
     let eye_to_scene = scene_to_eye.inverse();
-    let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 30_f32.to_radians() };
+    let viewport = Viewport { width: width as f32, height: height as f32, v_fov: 45_f32.to_radians() };
 
 
     let grey = Lambertian(Vec3A::new(0.5, 0.5, 0.5));
@@ -139,17 +139,27 @@ fn main() {
         circumference_roughness: 0.15,
         color: Vec3A::new(0.8, 0.9, 1.0) * 0.2
     };
-    let check = Checkerboard { size: 1.0, a: &gloss_floor, b: &yellow };
-
-
-
     let brushed_metal = BrushedMetal {
         size: 1.0,
         radial_roughness: 0.01,
         circumference_roughness: 0.15,
         color: Vec3A::new(0.8, 0.9, 1.0) * 0.5
     };
-//    Lambertian(Vec3A::new(0.4, 0.3, 0.1)) };
+    let dim_red_floor = GlossWrap {
+      gloss_color: Vec3A::ONE,
+      diffuse_color: Vec3A::new(0.3, 0.05, 0.1),
+      gloss_size: 0.2,
+      max_gloss: 0.2,
+      min_gloss: 0.0,
+      fresnel_power: 5.0
+  };
+  let check = Checkerboard { size: 2.0, a: &dim_red_floor, b: &gloss_floor };
+  let photo_scale = 10_f32;
+
+    let textured = TexturedLambert::new(
+      ImageReader::open("andrew.jpg").unwrap().decode().expect("Couldn't load texture"),
+      Affine3A::from_cols(Vec3A::ZERO, vec3a(1. / photo_scale, 0., 0.), vec3a(0., -1. / photo_scale, 0.), vec3a(-0.5, 0., 0.)));
+
     let sphere = GlossWrap {
         gloss_color: Vec3A::ONE,
         diffuse_color: Vec3A::new(0.35, 0.4, 0.5),
@@ -160,6 +170,7 @@ fn main() {
     };
     let red = Lambertian(Vec3A::new(1.0, 0.0, 0.0));
     let green_glow = Emitter { color: vec3a(0.4, 1.0, 0.4), focus: 1.0 };
+    let orb_glow = Emitter { color: vec3a(0.2, 0.3, 0.8) * 5., focus: 1.0 };
     let white_glow = Emitter { color: vec3a(1.0, 1.0, 1.0) * 3., focus: 0.0 };
 
     let scene = Scene {
@@ -167,14 +178,14 @@ fn main() {
             Box::new(Sphere {
                 center: Vec3A::new(0., 0., 1.5),
                 radius: 1.5,
-                material: &sphere
+                material: &orb_glow
             }),
             Box::new(Cuboid::new(
-                vec3a(3., -1.5, 0.),
-                Quat::from_rotation_z(-30.0f32.to_radians()),
-                vec3a(-0.1, -2., 0.0),
-                vec3a(0.1, 2., 4.0),
-                &brushed_metal)),
+                vec3a(3., 1.85, 0.),
+                Quat::from_rotation_z(20_f32.to_radians()),
+                vec3a(-0.3, -0.5 * photo_scale, 0.0),
+                vec3a(0.3, 0.5 * photo_scale, photo_scale),
+                &textured)),
             Box::new(Sphere {
                 center: Vec3A::new(-1.25, -1.25, 0.5),
                 radius: 0.5,
@@ -185,7 +196,12 @@ fn main() {
                 radius: 0.5,
                 material: &red
             }),
-            Box::new(Plane::new(Vec3A::Z, Vec3A::X, Vec3A::ZERO, &check))
+            Box::new(Sphere {
+              center: Vec3A::new(-3.0, 2., 5.),
+              radius: 0.9,
+              material: &sphere
+          }),
+          Box::new(Plane::new(Vec3A::Z, Vec3A::X, Vec3A::ZERO, &check))
             ]
     };
 
@@ -214,43 +230,9 @@ fn main() {
     bar.finish();
 
 
-    for (c, p) in colors.iter().zip(dest.pixels_mut()) {
-        let srgb = |c: f32| {
-            if c > 0.0 {
-                if c <= 0.0031308 { c * 12.92 }
-                else if c < 1.0 { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
-                else { 1.0 }
-            } else { 0.0 }
-        };
-        p[0] = srgb(c.x);
-        p[1] = srgb(c.y);
-        p[2] = srgb(c.z);
+    for (&c, p) in colors.iter().zip(dest.pixels_mut()) {
+        *p = linear_to_gamma_rgb(c.into());
     }
-
-    if false {
-        for p in dest.pixels_mut() {
-        p.apply(|c|
-            if c > 0.0 {
-                if c <= 0.04045 { c / 12.92 }
-                else if c < 1.0 { ((c + 0.055) / 1.055).powf(2.4) }
-                else { 1.0 }
-            } else { 0.0 });
-        //p.apply(|c| c.powf(2.2));
-        }
-    }
-
-    if false {
-        for p in dest.pixels_mut() {
-        p.apply(|c|
-            if c > 0.0 {
-                if c <= 0.0031308 { c * 12.92 }
-                else if c < 1.0 { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
-                else { 1.0 }
-            } else { 0.0 });
-        //p.apply(|c| c.powf(2.2));
-        }
-    }
-
 
     let rgb888: RgbImage = dest.convert();
     rgb888.save("test.png").expect("Could not save image file");

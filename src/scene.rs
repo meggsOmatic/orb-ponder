@@ -32,7 +32,9 @@ impl<'a> Scene<'a> {
           let color = hit.material.get_color(self, ray, &hit, ctx);
           color
       } else {
-          1.0 * Vec3A::new(0.1, 0.2, 0.3) + 0.02 * ray.direction.dot(Vec3A::new(0.8, 1.2, 1.6).normalize()).max(0.).powf(10.) * Vec3A::new(200., 175., 150.)
+          //Vec3A::ZERO
+          0.05 * Vec3A::new(0.3, 0.2, 0.2)
+          //0.05 * Vec3A::new(0.1, 0.2, 0.3) + 0.002 * ray.direction.dot(Vec3A::new(-0.8, 1.2, 1.6).normalize()).max(0.).powf(10.) * Vec3A::new(200., 175., 150.)
       }
   }
 }

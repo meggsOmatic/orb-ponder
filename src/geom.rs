@@ -49,3 +49,29 @@ pub fn get_point_in_sphere(rng: &mut TraceContext) -> Vec3A {
 pub fn reflect(ray: Vec3A, normal: Vec3A) -> Vec3A {
   ray - 2. * ray.dot(normal) * normal
 }
+
+
+pub fn linear_to_gamma_1(c: f32) -> f32 {
+    if c > 0.0 {
+        if c <= 0.0031308 { c * 12.92 }
+        else if c < 1.0 { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+        else { 1.0 }
+    } else { 0.0 }
+}
+
+pub fn gamma_to_linear_1(c: f32) -> f32 {
+    if c > 0.0 {
+        if c <= 0.04045 { c / 12.92 }
+        else if c < 1.0 { ((c + 0.055) / 1.055).powf(2.4) }
+        else { 1.0 }
+    } else { 0.0 }
+}
+
+pub fn gamma_to_linear_rgb(rgb: Rgb<f32>) -> Vec3 {
+    vec3(gamma_to_linear_1(rgb[0]), gamma_to_linear_1(rgb[1]), gamma_to_linear_1(rgb[2]))
+}
+
+pub fn linear_to_gamma_rgb(rgb: Vec3) -> Rgb<f32> {
+    Rgb([linear_to_gamma_1(rgb[0]), linear_to_gamma_1(rgb[1]), linear_to_gamma_1(rgb[2])])
+}
+

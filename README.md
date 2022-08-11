@@ -1,7 +1,8 @@
 # orb-ponder
 This is a personal attempt to grow as a Rust programmer by writing a CPU ray tracer from first principles. It's called **orb-ponder** because the first scene everyone raytraces is a sphere, and I've been thinking about that sphere a lot.
 
-![FZR8H-BWIAAL4CL](https://user-images.githubusercontent.com/5649419/183699033-535b7cfe-8bf1-431f-bf00-dd442d1cbc6f.jpg)![OrbPonder](https://user-images.githubusercontent.com/5649419/183699052-5543c132-74fb-4a6b-9104-1f1863e3b4ec.jpg)
+![FZR8H-BWIAAL4CL](https://user-images.githubusercontent.com/5649419/183699033-535b7cfe-8bf1-431f-bf00-dd442d1cbc6f.jpg)![OrbPonder](https://user-images.githubusercontent.com/5649419/183699052-5543c132-74fb-4a6b-9104-1f1863e3b4ec.jpg)![ponder](https://user-images.githubusercontent.com/5649419/184169019-47dae0f2-4777-443c-b919-6b8f84420652.jpg)
+
 
 I'm generally a novice at Rust, and I'm trying to gain experience using things like traits and `Vec<Box<dyn 'a + Shape>>` in a practical project. That's the first goal of this.
 
